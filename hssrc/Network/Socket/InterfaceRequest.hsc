@@ -125,6 +125,37 @@ instance Storable InterfaceFlags where
       , if ifaceEcho         then (#const IFF_ECHO       ) else 0
       ]
 
+#include <linux/if_tun.h>
+
+data InterfaceTunTapFlags = InterfaceTunTapFlags
+  { ifaceTunTapTun          :: Bool -- | IFF_TUN           TUN device (no Ethernet headers)
+  , ifaceTunTapTap          :: Bool -- | IFF_TAP           TAP device
+  , ifaceTunTapNoPi         :: Bool -- | IFF_NO_PI         Do not provide packet information
+  }
+
+ifaceTunTapDefaultFlags :: InterfaceTunTapFlags
+ifaceTunTapDefaultFlags =  InterfaceTunTapFlags
+  { ifaceTunTapTun          = False
+  , ifaceTunTapTap          = False
+  , ifaceTunTapNoPi         = False
+  }
+
+instance Storable InterfaceTunTapFlags where
+  sizeOf _ = sizeOf (undefined :: CShort)
+  alignment _ = alignment (undefined :: CShort)
+  peek p = fmap (\i -> InterfaceTunTapFlags
+                       { ifaceTunTapTun  = (i .&. (#const IFF_TUN        ) /= 0)
+                       , ifaceTunTapTap  = (i .&. (#const IFF_TAP        ) /= 0)
+                       , ifaceTunTapNoPi = (i .&. (#const IFF_NO_PI      ) /= 0)
+                       })
+                (peek ((castPtr p) :: Ptr CShort))
+  poke p (InterfaceTunTapFlags{..}) =
+    poke ((castPtr p) :: Ptr CShort) $ foldl' (.|.) 0
+      [ if ifaceTunTapTun          then (#const IFF_TUN        ) else 0
+      , if ifaceTunTapTap          then (#const IFF_TAP        ) else 0
+      , if ifaceTunTapNoPi         then (#const IFF_NO_PI      ) else 0
+      ]
+
 instance Storable a => Storable (InterfaceRequest a) where
   sizeOf _ = #size struct ifreq
   alignment _ = alignment (undefined :: CInt)
@@ -141,6 +172,10 @@ instance Storable a => Storable (InterfaceRequest a) where
 
 data GetInterfaceFlags = GetInterfaceFlags
 data SetInterfaceFlags = SetInterfaceFlags
+
+data GetInterfaceTunTapFlags = GetInterfaceTunTapFlags
+data SetInterfaceTunTapFlags = SetInterfaceTunTapFlags
+
 data SetInterfaceMTU = SetInterfaceMTU
 data SetNoCSum = SetNoCSum
 
@@ -149,6 +184,12 @@ instance IOControl GetInterfaceFlags (InterfaceRequest InterfaceFlags) where
 
 instance IOControl SetInterfaceFlags (InterfaceRequest InterfaceFlags) where
   ioctlReq _ = #const SIOCSIFFLAGS
+
+instance IOControl GetInterfaceTunTapFlags (InterfaceRequest InterfaceTunTapFlags) where
+  ioctlReq _ = #const TUNGETIFF
+
+instance IOControl SetInterfaceTunTapFlags (InterfaceRequest InterfaceTunTapFlags) where
+  ioctlReq _ = #const TUNSETIFF
 
 instance IOControl SetInterfaceMTU (InterfaceRequest CInt) where
   ioctlReq _ = #const SIOCSIFMTU
@@ -160,6 +201,14 @@ getInterfaceFlags s n =
 setInterfaceFlags :: Socket -> String -> InterfaceFlags -> IO ()
 setInterfaceFlags s n iflags =
   ioctlsocket_ s SetInterfaceFlags (InterfaceRequest n iflags)
+
+getInterfaceTunTapFlags :: Socket -> String -> IO InterfaceTunTapFlags
+getInterfaceTunTapFlags s n =
+  irValue <$> ioctlsocket s GetInterfaceTunTapFlags (InterfaceRequest n ifaceTunTapDefaultFlags)
+
+setInterfaceTunTapFlags :: Socket -> String -> InterfaceTunTapFlags -> IO ()
+setInterfaceTunTapFlags s n iflags =
+  ioctlsocket_ s SetInterfaceTunTapFlags (InterfaceRequest n iflags)
 
 setInterfaceMTU :: Socket -> String -> Int -> IO ()
 setInterfaceMTU s n mtu =

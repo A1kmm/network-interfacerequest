@@ -8,7 +8,7 @@ Maintainer: Andrew Miller (andrew.miller@lanthaps.com)
 Cabal-Version: >= 1.6
 Build-Type: Simple
 
-Version: 0.0.2
+Version: 0.0.3
 Library
   Build-tools: hsc2hs
   HS-Source-Dirs: hssrc
